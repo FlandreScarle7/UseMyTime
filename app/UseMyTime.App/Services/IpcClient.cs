@@ -48,61 +48,56 @@ public sealed class IpcClient
 
             string pipeName = $@"\\.\pipe\UseMyTime_{pid}";
 
-            using var pipe = new NamedPipeClientStream(
-                ".", pipeName, 8, PipeDirection.InOut, PipeOptions.Asynchronous);
-
-            // 带超时的连接
-            var connectTask = pipe.ConnectAsync(ct);
-            var timeoutTask = Task.Delay(ConnectTimeout, ct);
-            var finished = await Task.WhenAny(connectTask, timeoutTask);
-
-            if (finished == timeoutTask)
-                return (false, "", $"连接管道超时（目标进程可能未注入或 IPC 服务未启动）。");
-
-            try { await connectTask; }
-            catch (Exception ex)
+            // 同步管道 I/O 放到后台线程 —— 绝不在 UI 线程阻塞（强制要求）
+            return await Task.Run(() =>
             {
-                return (false, "", $"连接管道失败：{ex.Message}");
-            }
-
-            if (!pipe.IsConnected)
-                return (false, "", "管道未连接。");
-
-            // 写命令（行分隔）
-            byte[] payload = Encoding.UTF8.GetBytes(jsonCommand + "\n");
-            await pipe.WriteAsync(payload, ct);
-            await pipe.FlushAsync(ct);
-
-            // 读一行响应（带总超时，循环读取直到换行符）
-            var sb = new StringBuilder();
-            var buffer = new byte[8192];
-            using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            readTimeout.CancelAfter(ReadTimeout);
-
-            try
-            {
-                while (true)
+                try
                 {
-                    int bytesRead = await pipe.ReadAsync(buffer, 0, buffer.Length, readTimeout.Token);
-                    if (bytesRead <= 0)
-                        return (false, "", "管道已关闭（目标进程可能已退出）。");
-                    sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
-                    if (sb.ToString().Contains('\n'))
-                        break;
-                    if (sb.Length > 65536) // 防御：异常超长
-                        break;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                return (false, "", "读取响应超时。");
-            }
+                    // 2 参构造：默认 PipeDirection.InOut，避免重载解析歧义
+                    using var pipe = new NamedPipeClientStream(".", pipeName);
 
-            int nl = sb.ToString().IndexOf('\n');
-            string line = (nl >= 0 ? sb.ToString(0, nl) : sb.ToString()).Trim();
-            if (line.Length == 0)
-                return (false, "", "响应为空。");
-            return (true, line, "");
+                    // 带超时的连接
+                    if (!pipe.Connect(ConnectTimeout))
+                        return (false, "", "连接管道超时（目标进程可能未注入或 IPC 服务未启动）。");
+
+                    if (!pipe.IsConnected)
+                        return (false, "", "管道未连接。");
+
+                    // 写命令（行分隔）
+                    byte[] payload = Encoding.UTF8.GetBytes(jsonCommand + "\n");
+                    pipe.Write(payload, 0, payload.Length);
+                    pipe.Flush();
+
+                    // 读一行响应（循环直到换行符，带总超时）
+                    var sb = new StringBuilder();
+                    var buffer = new byte[8192];
+                    var deadline = DateTime.UtcNow + ReadTimeout;
+
+                    while (true)
+                    {
+                        if (DateTime.UtcNow > deadline)
+                            return (false, "", "读取响应超时。");
+                        int bytesRead = pipe.Read(buffer, 0, buffer.Length);
+                        if (bytesRead <= 0)
+                            return (false, "", "管道已关闭（目标进程可能已退出）。");
+                        sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+                        if (sb.ToString().Contains('\n'))
+                            break;
+                        if (sb.Length > 65536) // 防御：异常超长
+                            break;
+                    }
+
+                    int nl = sb.ToString().IndexOf('\n');
+                    string line = (nl >= 0 ? sb.ToString(0, nl) : sb.ToString()).Trim();
+                    if (line.Length == 0)
+                        return (false, "", "响应为空。");
+                    return (true, line, "");
+                }
+                catch (Exception ex)
+                {
+                    return (false, "", $"IPC 异常：{ex.Message}");
+                }
+            }, ct);
         }
         catch (OperationCanceledException)
         {
