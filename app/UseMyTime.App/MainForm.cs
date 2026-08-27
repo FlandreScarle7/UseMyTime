@@ -32,6 +32,10 @@ public sealed class MainForm : Form
         DropDownStyle = ComboBoxStyle.DropDownList,
     };
     private readonly Button _btnInject = new() { Text = "一键注入", AutoSize = true };
+    private readonly Label _lblPickHint = new()
+    {
+        Text = "↑ 先在左侧列表点选进程", AutoSize = true, ForeColor = Color.Gray,
+    };
 
     private readonly NumericUpDown _numHours = new()
     { Minimum = -48, Maximum = 48, Value = 0, Width = 60 };
@@ -106,44 +110,63 @@ public sealed class MainForm : Form
     {
         Text = "UseMyTime - 进程级时间劫持工具";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(760, 560);
-        MinimumSize = new Size(640, 480);
+        ClientSize = new Size(760, 640);
+        MinimumSize = new Size(640, 520);
         Font = new Font("Microsoft YaHei UI", 9.5f);
 
         // ===== 顶部：进程选择 =====
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 96, Padding = new Padding(12) };
+        var topPanel = new Panel { Dock = DockStyle.Top, Height = 176, Padding = new Padding(12) };
 
         var lblProcess = new Label { Text = "目标进程:", AutoSize = true, Location = new Point(12, 14) };
         _processList.Location = new Point(12, 38);
-        _processList.Size = new Size(280, 46);
+        _processList.Size = new Size(280, 122);
         _processList.HorizontalScrollbar = true;
 
         var lblTarget = new Label { Text = "已选目标:", AutoSize = true, Location = new Point(312, 14) };
         _cmbTarget.Location = new Point(312, 38);
         _cmbTarget.Size = new Size(240, 28);
+        _lblPickHint.Location = new Point(312, 70);
 
         _btnRefresh.Location = new Point(568, 38);
         _btnRefresh.Size = new Size(88, 28);
         _btnRefresh.Click += async (_, _) => await RefreshProcessListAsync();
 
-        _btnInject.Location = new Point(568, 70);
+        _btnInject.Location = new Point(568, 76);
         _btnInject.Size = new Size(168, 30);
         _btnInject.BackColor = Color.FromArgb(32, 160, 90);
         _btnInject.ForeColor = Color.White;
         _btnInject.FlatStyle = FlatStyle.Flat;
         _btnInject.Click += async (_, _) => await InjectAsync();
 
+        // 列表框 <-> 下拉框 选中状态双向同步（修复：只点列表也能注入）
+        _processList.SelectedIndexChanged += (_, _) =>
+        {
+            if (_syncingSelection) return;
+            _syncingSelection = true;
+            try
+            {
+                if (_processList.SelectedIndex >= 0 && _cmbTarget.SelectedIndex != _processList.SelectedIndex)
+                    _cmbTarget.SelectedIndex = _processList.SelectedIndex;
+            }
+            finally { _syncingSelection = false; }
+            UpdateTargetFromCombo();
+        };
         _cmbTarget.SelectedIndexChanged += (_, _) =>
         {
-            var info = _cmbTarget.SelectedItem as ProcessInfo;
-            _targetPid = info?.Id ?? -1;
-            _targetName = info?.Name ?? "";
-            UpdateStateLabel();
+            if (_syncingSelection) return;
+            _syncingSelection = true;
+            try
+            {
+                if (_cmbTarget.SelectedIndex >= 0 && _processList.SelectedIndex != _cmbTarget.SelectedIndex)
+                    _processList.SelectedIndex = _cmbTarget.SelectedIndex;
+            }
+            finally { _syncingSelection = false; }
+            UpdateTargetFromCombo();
         };
 
         topPanel.Controls.AddRange(new Control[]
         {
-            lblProcess, _processList, lblTarget, _cmbTarget, _btnRefresh, _btnInject,
+            lblProcess, _processList, lblTarget, _cmbTarget, _lblPickHint, _btnRefresh, _btnInject,
         });
 
         // ===== 中部：虚拟时间设置 =====
@@ -223,6 +246,32 @@ public sealed class MainForm : Form
     }
 
     // ------------------------------------------------------------------
+    // 目标选择（列表/下拉框任一选中都生效）
+    // ------------------------------------------------------------------
+    // 防止列表/下拉框互相同步时事件重入
+    private bool _syncingSelection;
+
+    private void UpdateTargetFromCombo()
+    {
+        var info = _cmbTarget.SelectedItem as ProcessInfo;
+        if (info == null)
+        {
+            _targetPid = -1;
+            _targetName = "";
+            _lblPickHint.Text = "↑ 先在左侧列表点选进程";
+            _lblPickHint.ForeColor = Color.Gray;
+        }
+        else
+        {
+            _targetPid = info.Id;
+            _targetName = info.Name;
+            _lblPickHint.Text = $"✓ 已选择 {info.Name} (pid={info.Id})";
+            _lblPickHint.ForeColor = Color.LimeGreen;
+        }
+        UpdateStateLabel();
+    }
+
+    // ------------------------------------------------------------------
     // 进程列表（后台枚举 -> UI 更新）
     // ------------------------------------------------------------------
     private async Task RefreshProcessListAsync()
@@ -236,6 +285,13 @@ public sealed class MainForm : Form
 
             _cmbTarget.Items.Clear();
             _processList.Items.Clear();
+            _syncingSelection = true;
+            try
+            {
+                _cmbTarget.SelectedIndex = -1;
+                _processList.SelectedIndex = -1;
+            }
+            finally { _syncingSelection = false; }
 
             int? previous = null;
             foreach (var p in list)
@@ -245,17 +301,29 @@ public sealed class MainForm : Form
                 if (p.Id == _targetPid) previous = p.Id;
             }
 
-            // 恢复之前的选择
-            for (int i = 0; i < _cmbTarget.Items.Count; i++)
+            // 恢复之前的选择（列表与下拉框同步）
+            _syncingSelection = true;
+            try
             {
-                if ((_cmbTarget.Items[i] as ProcessInfo)?.Id == previous)
+                for (int i = 0; i < _cmbTarget.Items.Count; i++)
                 {
-                    _cmbTarget.SelectedIndex = i;
-                    break;
+                    if ((_cmbTarget.Items[i] as ProcessInfo)?.Id == previous)
+                    {
+                        _cmbTarget.SelectedIndex = i;
+                        _processList.SelectedIndex = i;
+                        break;
+                    }
+                }
+                if (previous == null)
+                {
+                    _cmbTarget.SelectedIndex = -1;
+                    _processList.SelectedIndex = -1;
                 }
             }
+            finally { _syncingSelection = false; }
+            if (previous != null) UpdateTargetFromCombo();
 
-            AppendLog($"进程列表已刷新，共 {list.Count} 个候选进程。");
+            AppendLog($"进程列表已刷新，共 {list.Count} 个候选进程。点击左侧列表选择目标。");
         }
         catch (Exception ex)
         {
@@ -276,7 +344,7 @@ public sealed class MainForm : Form
         var info = _cmbTarget.SelectedItem as ProcessInfo;
         if (info == null)
         {
-            AppendLog("请先选择目标进程。", Color.OrangeRed);
+            AppendLog("尚未选择目标进程：请先点击左侧进程列表（或右侧下拉框）选中一个进程。", Color.OrangeRed);
             return;
         }
 
