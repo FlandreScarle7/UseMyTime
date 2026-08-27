@@ -95,7 +95,7 @@ public static class ProcessListService
         [return: System.Runtime.InteropServices.MarshalAs(
             System.Runtime.InteropServices.UnmanagedType.Bool)]
         public static extern bool IsWow64Process(
-            System.Runtime.InteropServices.IntPtr hProcess,
+            System.IntPtr hProcess,
             [System.Runtime.InteropServices.Out] out bool wow64Process);
     }
 }
