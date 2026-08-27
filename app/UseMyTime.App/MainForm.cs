@@ -24,11 +24,13 @@ public sealed class MainForm : Form
     // ------------------------------------------------------------------
     // 控件
     // ------------------------------------------------------------------
-    private readonly ListBox _processList = new() { Dock = DockStyle.Fill };
+    // 注意：必须 Dock=None！若为 Dock.Fill，Location/Size 会被忽略，
+    // 控件会撑满父面板并相互覆盖，导致按钮被遮挡（已踩过的坑）
+    private readonly ListBox _processList = new() { Dock = DockStyle.None };
     private readonly Button _btnRefresh = new() { Text = "刷新列表", AutoSize = true };
     private readonly ComboBox _cmbTarget = new()
     {
-        Dock = DockStyle.Fill,
+        Dock = DockStyle.None,
         DropDownStyle = ComboBoxStyle.DropDownList,
     };
     private readonly Button _btnInject = new() { Text = "一键注入", AutoSize = true };
