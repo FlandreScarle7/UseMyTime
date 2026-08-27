@@ -42,3 +42,6 @@ desktop.ini
 *.log
 *.tmp
 *.swp
+
+# --- 无关示例产物 ---
+/hello_world
