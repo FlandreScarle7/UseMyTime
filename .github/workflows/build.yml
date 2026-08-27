@@ -5,9 +5,10 @@
 # 环境: windows-latest (Visual Studio 2022 + .NET SDK)
 # 步骤:
 #   1. 检出代码
-#   2. MSBuild 编译 C++ hook DLL (Release x64)
-#   3. dotnet build 编译 C# WinForms 宿主 (Release x64)
-#   4. 将 exe + dll 打包为 Artifact 输出
+#   2. 安装 MSBuild (microsoft/setup-msbuild) 与 .NET 8 SDK (actions/setup-dotnet)
+#   3. MSBuild 编译 C++ hook DLL (Release x64)
+#   4. dotnet build 编译 C# WinForms 宿主 (Release x64)
+#   5. 将 exe + dll 打包为 Artifact 输出
 # ============================================================================
 name: Build
 
@@ -38,8 +39,18 @@ jobs:
           submodules: recursive
 
       # ------------------------------------------------------------------
-      # 2. 工具链版本
+      # 2. 工具链: MSBuild + .NET 8 SDK
       # ------------------------------------------------------------------
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
       - name: Show toolchain
         shell: pwsh
         run: |
@@ -77,8 +88,7 @@ jobs:
             -o "dist/$env:PLATFORM"
           if ($LASTEXITCODE -ne 0) { throw "dotnet build failed" }
 
-          # 把 C++ DLL 复制进发布目录（csproj 的 None 项在本地已拷贝，
-          # CI 中显式再拷一次以确保 dist 目录完整）
+          # 把 C++ DLL 复制进发布目录（确保 dist 目录完整）
           Copy-Item "native/bin/$env:PLATFORM/$env:CONFIGURATION/UseMyTimeHook.dll" `
                     "dist/$env:PLATFORM/UseMyTimeHook.dll" -Force
           Write-Host "Built: dist/$env:PLATFORM/UseMyTime.exe" -ForegroundColor Green
