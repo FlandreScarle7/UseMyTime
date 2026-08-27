@@ -293,8 +293,9 @@ public sealed class MainForm : Form
         try
         {
             // 关键：阻塞式 Win32 注入放到后台线程，UI 保持响应
+            string err = "";
             bool ok = await Task.Run(() =>
-                ProcessInjection.Inject(info.Id, _dllPath, out string err));
+                ProcessInjection.Inject(info.Id, _dllPath, out err));
 
             if (!ok)
             {

@@ -49,11 +49,10 @@ public sealed class IpcClient
             string pipeName = $@"\\.\pipe\UseMyTime_{pid}";
 
             using var pipe = new NamedPipeClientStream(
-                ".", pipeName, PipeDirection.InOut, PipeStreamAsynchronous);
+                ".", pipeName, 8, PipeDirection.InOut, PipeStreamOptions.Asynchronous);
 
             // 带超时的连接
-            var connectTcs = new TaskCompletionSource<bool>();
-            var connectTask = pipe.ConnectAsync(ConnectTimeout);
+            var connectTask = pipe.ConnectAsync(ct);
             var timeoutTask = Task.Delay(ConnectTimeout, ct);
             var finished = await Task.WhenAny(connectTask, timeoutTask);
 
@@ -185,8 +184,8 @@ public sealed class IpcClient
                 OffsetMs = root.TryGetProperty("offset_ms", out var om) ? om.GetInt64() : 0,
                 Speed = root.TryGetProperty("speed", out var s) ? s.GetDouble() : 1.0,
                 Enabled = root.TryGetProperty("enabled", out var e) && e.GetInt32() == 1,
-                RealTime = root.TryGetProperty("real_time", out var rt) ? rt.GetString() : "",
-                VirtualTime = root.TryGetProperty("virtual_time", out var vt) ? vt.GetString() : "",
+                RealTime = root.TryGetProperty("real_time", out var rt) ? rt.GetString() ?? "" : "",
+                VirtualTime = root.TryGetProperty("virtual_time", out var vt) ? vt.GetString() ?? "" : "",
                 DeltaMs = root.TryGetProperty("delta_ms", out var d) ? d.GetInt64() : 0,
             };
             if (!status.Ok)
