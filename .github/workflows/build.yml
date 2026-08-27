@@ -1,0 +1,102 @@
+# ============================================================================
+# UseMyTime - CI/CD
+#
+# 触发: push 到 main 分支（也支持 PR 与手动触发）
+# 环境: windows-latest (Visual Studio 2022 + .NET SDK)
+# 步骤:
+#   1. 检出代码
+#   2. MSBuild 编译 C++ hook DLL (Release x64)
+#   3. dotnet build 编译 C# WinForms 宿主 (Release x64)
+#   4. 将 exe + dll 打包为 Artifact 输出
+# ============================================================================
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CONFIGURATION: Release
+  PLATFORM: x64
+  ARTIFACT_NAME: usemytime-windows-x64
+
+jobs:
+  build:
+    name: Build (windows-latest)
+    runs-on: windows-latest
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. 检出
+      # ------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ------------------------------------------------------------------
+      # 2. 工具链版本
+      # ------------------------------------------------------------------
+      - name: Show toolchain
+        shell: pwsh
+        run: |
+          msbuild -version
+          dotnet --version
+          git --version
+
+      # ------------------------------------------------------------------
+      # 3. 编译 C++ hook DLL (MSBuild)
+      # ------------------------------------------------------------------
+      - name: Build C++ hook DLL (MSBuild)
+        shell: pwsh
+        run: |
+          msbuild UseMyTime.sln `
+            /t:Build `
+            /p:Configuration=$env:CONFIGURATION `
+            /p:Platform=$env:PLATFORM `
+            /m /v:m
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild failed" }
+
+          # 校验产物
+          $dll = "native/bin/$env:PLATFORM/$env:CONFIGURATION/UseMyTimeHook.dll"
+          if (-not (Test-Path $dll)) { throw "UseMyTimeHook.dll not found at $dll" }
+          Write-Host "Built: $dll" -ForegroundColor Green
+
+      # ------------------------------------------------------------------
+      # 4. 编译 C# WinForms 宿主 (dotnet)
+      # ------------------------------------------------------------------
+      - name: Build C# app (dotnet)
+        shell: pwsh
+        run: |
+          dotnet build app/UseMyTime.App/UseMyTime.App.csproj `
+            -c $env:CONFIGURATION `
+            -a $env:PLATFORM `
+            -o "dist/$env:PLATFORM"
+          if ($LASTEXITCODE -ne 0) { throw "dotnet build failed" }
+
+          # 把 C++ DLL 复制进发布目录（csproj 的 None 项在本地已拷贝，
+          # CI 中显式再拷一次以确保 dist 目录完整）
+          Copy-Item "native/bin/$env:PLATFORM/$env:CONFIGURATION/UseMyTimeHook.dll" `
+                    "dist/$env:PLATFORM/UseMyTimeHook.dll" -Force
+          Write-Host "Built: dist/$env:PLATFORM/UseMyTime.exe" -ForegroundColor Green
+
+      # ------------------------------------------------------------------
+      # 5. 打包 Artifact
+      # ------------------------------------------------------------------
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "publish" | Out-Null
+          Copy-Item "dist/$env:PLATFORM/*" "publish/" -Recurse -Force
+          Get-ChildItem publish -Recurse | ForEach-Object { Write-Host $_.FullName }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: publish/
+          if-no-files-found: error
+          retention-days: 30

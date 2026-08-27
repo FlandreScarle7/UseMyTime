@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# UseMyTime .gitignore
+# ---------------------------------------------------------------------------
+
+# --- Visual Studio / MSBuild ---
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+.vs/
+*.user
+*.sdf
+*.suo
+*.db
+*.aps
+ipch/
+*.aps
+*.exp
+*.lib
+*.pdb
+*.ilk
+*.idb
+*.pch
+
+# --- .NET / C# ---
+app/UseMyTime.App/bin/
+app/UseMyTime.App/obj/
+*.DotSettings.user
+
+# --- minhook build artifacts (source is tracked) ---
+native/UseMyTimeHook/source/MinHook/*.o
+native/UseMyTimeHook/source/MinHook/*.obj
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- logs / temp ---
+*.log
+*.tmp
+*.swp
