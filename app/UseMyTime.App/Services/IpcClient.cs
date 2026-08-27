@@ -12,6 +12,7 @@
  *   4. 连接前先探测目标进程是否存活
  */
 using System.IO;
+using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 
@@ -76,8 +77,7 @@ public sealed class IpcClient
             // 读一行响应（带总超时，循环读取直到换行符）
             var sb = new StringBuilder();
             var buffer = new byte[8192];
-            var overallCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(overallCts);
+            using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             readTimeout.CancelAfter(ReadTimeout);
 
             try
@@ -191,8 +191,8 @@ public sealed class IpcClient
             };
             if (!status.Ok)
             {
-                string e = root.TryGetProperty("error", out var ep) ? ep.GetString() ?? "unknown" : "unknown";
-                return (false, status, e);
+                string errMsg = root.TryGetProperty("error", out var ep) ? ep.GetString() ?? "unknown" : "unknown";
+                return (false, status, errMsg);
             }
             return (true, status, "");
         }

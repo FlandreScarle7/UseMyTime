@@ -4,6 +4,7 @@
  * 枚举可注入的目标进程（过滤系统关键进程，只保留用户可见/可注入候选）。
  */
 using System.Diagnostics;
+using System.IO;
 
 namespace UseMyTime.App.Services;
 
@@ -27,12 +28,13 @@ public static class ProcessListService
     {
         var result = new List<ProcessInfo>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int currentSession = Process.GetCurrentProcess().SessionId;
 
         foreach (var p in Process.GetProcesses())
         {
             try
             {
-                if (p.SessionId != Environment.CurrentSession)
+                if (p.SessionId != currentSession)
                 {
                     p.Dispose();
                     continue; // 只列当前会话

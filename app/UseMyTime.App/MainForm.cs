@@ -13,6 +13,7 @@
  *   - 任何 IPC 失败只写日志，不弹窗崩溃，不影响目标游戏
  */
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Forms;
 using UseMyTime.App.Services;
 
@@ -522,7 +523,7 @@ public sealed class MainForm : Form
             {
                 // 同步短等待，最多 2 秒
                 var t = IpcClient.ShutdownAsync(_targetPid,
-                    CancellationTokenSource.CreateLinkedTokenSource(_cts.Token).CancelAfter(2000));
+                    CancellationTokenSource.CreateLinkedTokenSource(_cts.Token).Token);
                 t.GetAwaiter().GetResult();
                 AppendLog("已通知目标进程卸载 hook，恢复真实时间。");
             }
