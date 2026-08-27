@@ -38,6 +38,9 @@ public:
     // 停止 IPC 服务并退出线程。
     static void Stop();
 
+    // 请求停止（供 IPC 命令处理等外部上下文调用，线程安全）。
+    static void RequestStop();
+
     // 当前管道名
     static std::string PipeName();
 

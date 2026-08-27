@@ -46,6 +46,12 @@ bool IpcServer::Start()
     return true;
 }
 
+void IpcServer::RequestStop()
+{
+    s_running.store(false, std::memory_order_relaxed);
+    if (s_stopEvent) SetEvent(s_stopEvent);
+}
+
 void IpcServer::Stop()
 {
     if (!s_started.load(std::memory_order_acquire)) return;
@@ -107,7 +113,7 @@ static std::string HandleCommand(const std::string& line)
         r.SetBool("ok", true);
         r.SetString("msg", "shutdown");
         resp = r.Dump();
-        s_running.store(false); // 触发服务端线程退出
+        IpcServer::RequestStop(); // 触发服务端线程退出
     }
     else {
         MiniJson r;
