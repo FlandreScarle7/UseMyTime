@@ -19,8 +19,8 @@
 
   <!-- 将编译好的 C++ hook DLL 复制到输出目录 -->
   <ItemGroup>
-    <None Include="..\..\native\bin\x64\Release\UseMyTimeHook.dll"
-          Condition="Exists('..\..\native\bin\x64\Release\UseMyTimeHook.dll')">
+    <None Include="..\..\bin\x64\Release\UseMyTimeHook.dll"
+          Condition="Exists('..\..\bin\x64\Release\UseMyTimeHook.dll')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>UseMyTimeHook.dll</Link>
     </None>

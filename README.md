@@ -106,7 +106,7 @@ UI「恢复真实时间」 ──IPC reset──►  TimeHooks::Reset()
 ### 本地（Windows + VS2022）
 
 ```powershell
-# 1. C++ hook DLL（产物: native/bin/x64/Release/UseMyTimeHook.dll）
+# 1. C++ hook DLL（产物: bin/x64/Release/UseMyTimeHook.dll）
 msbuild UseMyTime.sln /t:Build /p:Configuration=Release /p:Platform=x64
 
 # 2. C# 宿主（自动把 DLL 拷到输出目录）

@@ -72,7 +72,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "MSBuild failed" }
 
           # 校验产物
-          $dll = "native/bin/$env:PLATFORM/$env:CONFIGURATION/UseMyTimeHook.dll"
+          $dll = "bin/$env:PLATFORM/$env:CONFIGURATION/UseMyTimeHook.dll"
           if (-not (Test-Path $dll)) { throw "UseMyTimeHook.dll not found at $dll" }
           Write-Host "Built: $dll" -ForegroundColor Green
 
@@ -89,7 +89,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "dotnet build failed" }
 
           # 把 C++ DLL 复制进发布目录（确保 dist 目录完整）
-          Copy-Item "native/bin/$env:PLATFORM/$env:CONFIGURATION/UseMyTimeHook.dll" `
+          Copy-Item "bin/$env:PLATFORM/$env:CONFIGURATION/UseMyTimeHook.dll" `
                     "dist/$env:PLATFORM/UseMyTimeHook.dll" -Force
           Write-Host "Built: dist/$env:PLATFORM/UseMyTime.exe" -ForegroundColor Green
 
