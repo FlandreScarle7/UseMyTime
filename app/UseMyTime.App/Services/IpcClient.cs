@@ -49,7 +49,7 @@ public sealed class IpcClient
             string pipeName = $@"\\.\pipe\UseMyTime_{pid}";
 
             using var pipe = new NamedPipeClientStream(
-                ".", pipeName, 8, PipeDirection.InOut, PipeStreamOptions.Asynchronous);
+                ".", pipeName, PipeDirection.InOut, 8, PipeOptions.Asynchronous);
 
             // 带超时的连接
             var connectTask = pipe.ConnectAsync(ct);
