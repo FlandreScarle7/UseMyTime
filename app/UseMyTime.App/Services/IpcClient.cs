@@ -56,12 +56,11 @@ public sealed class IpcClient
                     // 2 参构造：默认 PipeDirection.InOut，避免重载解析歧义
                     using var pipe = new NamedPipeClientStream(".", pipeName);
 
-                    // 带超时的连接
-                    if (!pipe.Connect(ConnectTimeout))
-                        return (false, "", "连接管道超时（目标进程可能未注入或 IPC 服务未启动）。");
+                    // 带超时的连接（Connect 返回 void，成功后 IsConnected 为 true）
+                    pipe.Connect(ConnectTimeout);
 
                     if (!pipe.IsConnected)
-                        return (false, "", "管道未连接。");
+                        return (false, "", "连接管道超时（目标进程可能未注入或 IPC 服务未启动）。");
 
                     // 写命令（行分隔）
                     byte[] payload = Encoding.UTF8.GetBytes(jsonCommand + "\n");
